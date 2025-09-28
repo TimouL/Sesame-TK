@@ -94,3 +94,40 @@ jobs:
           echo "Creating tag: $VERSION_TAG"
           git tag "$VERSION_TAG"
           git push origin "$VERSION_TAG"
+      - name: Get current time
+        id: get_time
+        if: startsWith(github.ref, 'refs/heads/my') && github.event_name == 'push'
+        run: |
+          echo "time=$(date '+%Y-%m-%d %H:%M:%S %Z')" >> $GITHUB_OUTPUT
+
+      - name: Create Release with Assets
+        if: startsWith(github.ref, 'refs/heads/my') && github.event_name == 'push'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.extract_info.outputs.version }}
+          name: 📦 Sesame-TK v${{ steps.extract_info.outputs.version }}
+          body: |
+            ## 🚀 Sesame-TK v${{ steps.extract_info.outputs.version }} 发布
+            
+            ### 📱 下载说明
+            - **Normal版本**: 适用于大部分Android设备
+            - **Compatible版本**: 兼容性更好，适用于较老设备或特殊ROM
+            
+            ### 📝 本次更新
+            ${{ github.event.headcommit.message || '手动构建发布' }}
+            
+            ### 👤 提交者
+            ${{ github.event.head_commit.author.name || github.actor }}
+            
+            ### 🔗 详细信息
+            - 提交SHA: `${{ github.sha }}`
+            - 构建时间: ${{ steps.get_time.outputs.time }}
+            - [查看提交详情](${{ github.event.head_commit.url }})
+          files: |
+            ${{ steps.locate_apks.outputs.normal_apk }}
+            ${{ steps.locate_apks.outputs.compatible_apk }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            
