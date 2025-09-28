@@ -51,65 +51,44 @@ jobs:
           echo "normal_apk=$normal_apk" >> $GITHUB_OUTPUT
           echo "compatible_apk=$compatible_apk" >> $GITHUB_OUTPUT
 
-      - name: Copy APKs to staging for signing
-        run: |
-          mkdir -p app/build/outputs/apk/all
-          cp "${{ steps.locate_apks.outputs.normal_apk }}" app/build/outputs/apk/all/
-          cp "${{ steps.locate_apks.outputs.compatible_apk }}" app/build/outputs/apk/all/
-
-      - name: Sign APKs
-        id: sign_apks
-        uses: ilharp/sign-android-release@v2
-        with:
-          releaseDir: app/build/outputs/apk/all
-          signingKey: ${{ secrets.ANDROID_SIGNING_KEY }}
-          keyAlias: ${{ secrets.ANDROID_KEY_ALIAS }}
-          keyStorePassword: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          keyPassword: ${{ secrets.ANDROID_KEY_PASSWORD }}
-          buildToolsVersion: 36.0.0
-
-      - name: Extract Signed APK Paths
-        id: extract_apks
-        run: |
-          IFS=':' read -r -a files <<< "${{ steps.sign_apks.outputs.signedFiles }}"
-          for file in "${files[@]}"; do
-            if [[ "$file" == *Normal* ]]; then
-              echo "signed_normal=$file" >> $GITHUB_OUTPUT
-            elif [[ "$file" == *Compatible* ]]; then
-              echo "signed_compatible=$file" >> $GITHUB_OUTPUT
-            fi
-          done
+      # 签名相关步骤已注释（正确）
+      # - name: Copy APKs to staging for signing
+      # - name: Sign APKs  
+      # - name: Extract Signed APK Paths
 
       - name: Upload APK - Compatible
         uses: actions/upload-artifact@v4
         with:
           name: apk-compatible
-          path: ${{ steps.extract_apks.outputs.signed_compatible }}
+          path: ${{ steps.locate_apks.outputs.compatible_apk }}
 
       - name: Upload APK - Normal
         uses: actions/upload-artifact@v4
         with:
           name: apk-normal
-          path: ${{ steps.extract_apks.outputs.signed_normal }}
+          path: ${{ steps.locate_apks.outputs.normal_apk }}
 
       - name: Extract file names
         id: extract_info
         run: |
-          normal_file=$(basename "${{ steps.extract_apks.outputs.signed_normal }}")
-          compatible_file=$(basename "${{ steps.extract_apks.outputs.signed_compatible }}")
-          # 提取版本号（以"Normal-"或"Compatible-"之后的部分为起点，以"-signed"之前的内容为终点）
-          version=$(echo "$normal_file" | sed -E 's/.*-(Normal|Compatible)-(v[^-]+).*-signed\.apk/\2/')
+          # 修改：使用原始APK文件路径
+          normal_file=$(basename "${{ steps.locate_apks.outputs.normal_apk }}")
+          compatible_file=$(basename "${{ steps.locate_apks.outputs.compatible_apk }}")
+          # 修改：调整正则表达式，移除对-signed的匹配
+          version=$(echo "$normal_file" | sed -E 's/.*-(Normal|Compatible)-(v[^-]+).*\.apk/\2/')
           echo "normal_file=$normal_file" >> $GITHUB_OUTPUT
           echo "compatible_file=$compatible_file" >> $GITHUB_OUTPUT
           echo "version=$version" >> $GITHUB_OUTPUT
 
       - name: Generate APKS Checksum
         run: |
-          sha256sum ${{ steps.extract_apks.outputs.signed_normal }} > CHECKSUMS-Sesame-Normal-${{ steps.extract_info.outputs.version }}.${{ env.SHORT_SHA }}-signed.apk.sha256
-          sha256sum ${{ steps.extract_apks.outputs.signed_compatible }} > CHECKSUMS-Sesame-Compatible-${{ steps.extract_info.outputs.version }}.${{ env.SHORT_SHA }}-signed.apk.sha256
+          # 修改：使用原始APK文件路径，文件名也要相应修改
+          sha256sum ${{ steps.locate_apks.outputs.normal_apk }} > CHECKSUMS-Sesame-Normal-${{ steps.extract_info.outputs.version }}.${{ env.SHORT_SHA }}.apk.sha256
+          sha256sum ${{ steps.locate_apks.outputs.compatible_apk }} > CHECKSUMS-Sesame-Compatible-${{ steps.extract_info.outputs.version }}.${{ env.SHORT_SHA }}.apk.sha256
 
       - name: Create Tag from Version
-        if: startsWith(github.ref, 'refs/heads/n') && github.event_name == 'push'
+        # 修改：条件改为匹配 'my' 分支
+        if: startsWith(github.ref, 'refs/heads/my') && github.event_name == 'push'
         run: |
           VERSION_TAG="v${{ steps.extract_info.outputs.version }}"
           echo "Creating tag: $VERSION_TAG"
